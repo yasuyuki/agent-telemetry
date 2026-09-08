@@ -77,6 +77,7 @@ class CodexTests(unittest.TestCase):
             with self.subTest(data=data), self.assertRaises(ValueError):
                 CodexAdapter().decode(data, 1)
         for key, value in (("success", {"intValue": "1"}),
+                           ("duration_ms", {"doubleValue": 10**400}),
                            ("input_token_count", {"intValue": "-1"}),
                            ("input_token_count", {"boolValue": True}),
                            ("duration_ms", {"stringValue": "nan"}),

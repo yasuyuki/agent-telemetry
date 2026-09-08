@@ -1,6 +1,6 @@
 # agent-telemetry
 
-Linux 向けのローカル実行記録基盤。Codex の公式 OpenTelemetry ログを
+Linux 向けのローカル実行記録基盤。Codex / Claude Code の公式 OpenTelemetry ログを
 OTLP/HTTP JSON で受信し、許可した項目だけを SQLite へ保存する。
 Python 3.11 以上。実行時の外部ライブラリは不要。
 
@@ -80,6 +80,55 @@ codex "${codex_args[@]}"
 本サービスは body、prompt、arguments、output、error、user.email などを保存しない。
 この設定は Codex 自身の履歴や別の送信先のログを削除するものではない。
 
+## Claude Code の設定
+
+受信サービスの起動引数に `--adapter claude` を追加する（既定は `codex`）。
+1つの受信口は1つのアダプター専用。同時利用する場合は別ポートで起動する。
+[Claude Code 公式 Monitoring](https://code.claude.com/docs/en/monitoring-usage)
+のログ専用設定を使う（2026-09-08 確認）。以下は Bash の試験プロセスだけに適用し、
+ユーザー設定ファイルは変更しない。受信サービスを先に起動しておく。
+
+```bash
+claude_env=(CLAUDE_CODE_ENABLE_TELEMETRY=1)
+claude_env+=(OTEL_LOGS_EXPORTER=otlp)
+claude_env+=(OTEL_EXPORTER_OTLP_LOGS_PROTOCOL=http/json)
+claude_env+=(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:4318/v1/logs)
+claude_env+=(OTEL_METRICS_EXPORTER=none OTEL_TRACES_EXPORTER=none)
+claude_env+=(CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=0)
+claude_env+=(ENABLE_ENHANCED_TELEMETRY_BETA=0)
+claude_env+=(OTEL_LOG_USER_PROMPTS=0 OTEL_LOG_ASSISTANT_RESPONSES=0)
+claude_env+=(OTEL_LOG_TOOL_DETAILS=0 OTEL_LOG_TOOL_CONTENT=0)
+claude_env+=(OTEL_LOG_RAW_API_BODIES=0)
+claude_args=(-p)
+claude_args+=('Run printf telemetry-smoke-ok once, then reply done.')
+claude_args+=(--tools Bash --allowedTools 'Bash(printf telemetry-smoke-ok)')
+claude_args+=(--no-session-persistence --output-format json)
+env "${claude_env[@]}" claude "${claude_args[@]}"
+```
+
+公開 launcher を使う環境では `claude` の部分を既存の公開起動入口に置き換え、
+その CLI 引数部分へ `claude_args` を渡す。環境の managed 設定が送信先を固定している
+場合はその設定が優先される。実行が終了してログが送信された後、検索結果の
+`session_id` で絞り込む。受信サービス停止後も同じ query を使える。
+本文出力を無効にしても利用者属性などは送られ得るが、本サービスは保存しない。
+
+| 共通項目 | Claude OTLP の入力 |
+| --- | --- |
+| `platform` | `claude` |
+| `event_name` | 属性 `event.name` に `claude_code.` を付与（既に付いていれば保持） |
+| `session_id` | `session.id`（resource 属性も参照） |
+| `model`, `cli_version` | `model`, `app.version`（resource 属性も参照）。版がなければ resource の `service.name=claude-code` に限り `service.version` |
+| `occurred_at_ns` | 非ゼロの `timeUnixNano`、なければ `event.timestamp` |
+| `tool_name`, `success`, `duration_ms` | 同名のイベント属性 |
+| `input_tokens`, `output_tokens` | 同名のイベント属性 |
+| `cached_input_tokens`, `cache_write_tokens` | `cache_read_tokens`, `cache_creation_tokens` |
+| `reasoning_output_tokens`, `total_tokens` | 未提供のため常に `null` |
+
+対象は `user_prompt`、`api_request`、`api_error`、`tool_decision`、`tool_result` のみ。
+成否は明示された `success` だけを読み、API エラー名やツール承認判断から補完しない。
+未提供値は `null`、提供されたゼロ値は `0`。OTLP の `timeUnixNano=0` は未設定を表す。
+費用、本文、引数、出力、エラー文章、利用者情報、未知イベントは保存しない。
+
 ## 検索
 
 このリポジトリの Bash ターミナルで実行する。出力は JSON 配列。
@@ -111,7 +160,7 @@ query+=(--session "$session_id")
 固定の `Record`（スキーマ版 1）を `records` 表へ保存する。
 `session_id, occurred_at_ns` と `occurred_at_ns` に索引がある。
 文字列の識別子は英数字と `_.:/+-` のみとし、空白や `@` を含む任意識別子は保存しない。
-Codex アダプターでは該当値を欠損へ落とす。
+組み込みアダプターでは該当値を欠損へ落とす。
 これは許可項目への射影であり、任意の入力に対する秘密検出器ではない。
 セッション ID と利用時刻も利用者の行動情報としてローカルで管理する。
 

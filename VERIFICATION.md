@@ -13,14 +13,15 @@ Codex 本体の更新・再配置はこの検証に含めない。
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-22 テスト合格。合成 OTLP の属性変換・欠損・ゼロ・未知イベント・不正入力・
+29 テスト合格（Claude 追加後の全件再実行）。合成 OTLP の属性変換・欠損・ゼロ・未知イベント・不正入力・
 nanosecond 時刻保持、SQLite ファイルへの本文非混入、再読取と時刻検索、
 並行 HTTP 保存、transaction 途中の SQL 失敗で全件 rollback、保存失敗の 503、
 HTTP framing 拒否、loopback 制限、既存の異種 DB を変更しないことを確認した。
 
 `test_plugin.py` は一時 venv にコアと独立 fixture パッケージをインストールし、
 repo 外の cwd、Python `-I` で実行する。インストール先からの import と、
-entry point で選んだ別プラットフォームの HTTP 200・SQLite 保存を確認する。
+entry point で選んだ別プラットフォームと `claude` の HTTP 200・SQLite 保存、
+停止後の read-only 再読取を確認する。
 テストには venv / pip と build 依存を取得できる環境が必要。
 
 独立レビューで検出した `success=NULL` の `false` 化を修正し、round-trip の
@@ -63,6 +64,46 @@ Codex の JSON 出力でツール終了コード 0 と最終応答を確認し�
 イベントも実際に受信されており、全イベントの input 合計は CLI と一致しない。
 そのイベントの発生理由は未確認。先頭を常に捨てるなどの推測ルールは実装していない。
 この基盤が保証するのはイベント単位の保存であり、請求額や CLI 合計の自動再構成ではない。
+
+## Claude Code 実通信
+
+2026-09-08、Linux / Python 3.14.4 / Claude Code 2.1.263 で実施。
+既存公開 `place.py list` で W1 の Claude を確認し、`place.py start` で起動した。
+README の環境変数を試験プロセスだけに渡し、恒久設定・認証 HOME は変更しなかった。
+CLI 本体の更新や配置変更は検証対象に含めない。
+受信はインストール済み `agent-telemetry serve --adapter claude` を使用。
+無害な `printf telemetry-smoke-ok` を Bash で1回実行し、CLI 終了成功・承認拒否なしと
+OTel の `tool_result.success=true` を確認した。
+
+最終検証セッションで6行を保存した（保存名はすべて `claude_code.*`）。
+
+| イベント | 行数 | 確認した情報 |
+| --- | ---: | --- |
+| user_prompt | 1 | セッション ID と発生時刻、本文は保存しない |
+| api_request | 3 | モデル、所要時間、入出力・キャッシュ読み書きトークン |
+| tool_decision | 1 | Bash、success は null |
+| tool_result | 1 | Bash、success=true、63 ms |
+
+全行のセッション ID が CLI の結果と一致し、発生時刻は受信時刻以前だった。
+CLI 版は全行で `2.1.263`。`app.version` だけを読む初回試験では欠損だったため、
+[公式 service information](https://code.claude.com/docs/en/monitoring-usage#service-information)
+の resource `service.version` を補完元に追加し、新セッションで再検証した。
+Desktop アプリ版との混同を避け、resource `service.name=claude-code` の場合だけ補完する。
+この優先順位と Desktop 除外は合成テストでも検証した。
+
+API イベントには `claude-haiku-4-5-20251001` と `claude-opus-5` が含まれた。
+非ゼロの入出力・cache-read・cache-write とゼロのキャッシュ値を観測した。
+API イベントと tool_decision の success、全行の total / reasoning は null のまま。
+CLI の使用量合計や課金額の再現は検証していない。
+
+受信サービスを停止し、別プロセスのインストール済み query で6行を再読取した。
+セッション検索、時刻の包含・除外、本文マーカーの SQLite ファイル非混入を確認した。
+DB と CLI の試験結果は repo 外のローカルデータ領域に保存し、生 OTLP は記録しない。
+
+合成試験では5イベントの正規化、属性対応、欠損・ゼロ・false、ナノ秒時刻、
+不正な構造・値（巨大数を含む）、未知イベントと本文の非保存、バッチ末尾の不正入力で
+HTTP 400・部分保存なしを確認した。共通 SQLite の SQL 途中失敗 rollback も全件再実行した。
+実 API エラー、失敗ツール、承認拒否、Desktop、他の Claude 版は未検証。
 
 ## 未検証・対象外
 

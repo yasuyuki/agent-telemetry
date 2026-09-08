@@ -13,6 +13,7 @@ agent-telemetry = "agent_telemetry.cli:main"
 
 [project.entry-points."agent_telemetry.adapters"]
 codex = "agent_telemetry.codex:CodexAdapter"
+claude = "agent_telemetry.claude:ClaudeAdapter"
 
 [tool.setuptools.packages.find]
 where = ["src"]
