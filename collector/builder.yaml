@@ -1,0 +1,17 @@
+dist:
+  module: github.com/yasuyuki/agent-telemetry/collector
+  name: agent-telemetry-collector
+  description: Sanitized local agent telemetry collector
+  version: 0.161.0
+  output_path: ./build
+  cgo_enabled: true
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.161.0
+processors:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.161.0
+exporters:
+  - gomod: github.com/yasuyuki/agent-telemetry/exporter v0.0.0
+    name: agenttelemetryexporter
+replaces:
+  - github.com/yasuyuki/agent-telemetry/exporter => ../../exporter

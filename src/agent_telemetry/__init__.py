@@ -1,4 +1,4 @@
-"""Local telemetry receiver with a deliberately small, fixed data model."""
+"""Read-only query model for the local Collector telemetry store."""
 
 from .model import Record
 

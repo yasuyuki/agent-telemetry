@@ -4,16 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-telemetry"
-version = "0.1.0"
-description = "Extensible local agent telemetry receiver and SQLite event store"
+version = "0.2.0"
+description = "Read-only query client for the local Collector telemetry store"
 requires-python = ">=3.11"
 
 [project.scripts]
 agent-telemetry = "agent_telemetry.cli:main"
-
-[project.entry-points."agent_telemetry.adapters"]
-codex = "agent_telemetry.codex:CodexAdapter"
-claude = "agent_telemetry.claude:ClaudeAdapter"
 
 [tool.setuptools.packages.find]
 where = ["src"]
