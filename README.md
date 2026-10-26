@@ -7,7 +7,7 @@ Collector は手動の foreground 起動を想定する。外部 network、dashb
 
 ## 固定版と構築
 
-Linux amd64、Go 1.26.0、Python 3.11 以上、C compiler が必要。
+Linux amd64、Go 1.26.0、Python 3.14、C compiler が必要。
 公式 `otelcol-contrib` 0.161.0 の stock probe に使用した archive
 `otelcol-contrib_0.161.0_linux_amd64.tar.gz` の SHA-256 は
 `778c689efa681ff6e4722ce9f66b9b7f57c3ba009ab2e2b43dc2e0315862c731`。
